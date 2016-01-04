@@ -1,0 +1,12 @@
+[submodule "src/vendor/github.com/nathanaelle/syslog5424"]
+	path = src/vendor/github.com/nathanaelle/syslog5424
+	url = https://github.com/nathanaelle/syslog5424
+[submodule "src/vendor/github.com/nathanaelle/useful.types"]
+	path = src/vendor/github.com/nathanaelle/useful.types
+	url = https://github.com/nathanaelle/useful.types
+[submodule "src/vendor/github.com/naoina/toml"]
+	path = src/vendor/github.com/naoina/toml
+	url = https://github.com/naoina/toml
+[submodule "src/vendor/golang.org/x/crypto"]
+	path = src/vendor/golang.org/x/crypto
+	url = https://go.googlesource.com/crypto

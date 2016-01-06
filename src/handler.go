@@ -2,6 +2,7 @@ package	main
 
 
 import	(
+	"io"
 	"fmt"
 	"net"
 	"bytes"
@@ -129,6 +130,8 @@ func	(h *BuffHandler) Inject(db *HTTPDB) {
 
 
 func	(h *BuffHandler) Serve(l net.Listener) error {
+	defer	l.Close()
+
 	for {
 		fd,err := l.Accept()
 
@@ -155,15 +158,16 @@ func	(h *BuffHandler) cope_with(con net.Conn) {
 		con.Write(h.Transport.Encode(d))
 	})
 
-	if err == nil {
+	switch err {
+	case	nil:
 		return
-	}
 
-	if _,ok := err.(*EOConn); ok {
+	case	io.EOF:
 		return
-	}
 
-	panic(err)
+	default:
+		panic(err)
+	}
 }
 
 

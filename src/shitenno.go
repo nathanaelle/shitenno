@@ -1,6 +1,7 @@
 package main
 
 import	(
+	"io"
 	"os"
 	"log"
 	"flag"
@@ -50,8 +51,7 @@ type	(
 )
 
 const	(
-	LISTEN_EXPIRE	time.Duration	= 100*time.Millisecond
-	CONN_EXPIRE	time.Duration	= 10*time.Second
+	IO_TIMEOUT	time.Duration	= 200*time.Millisecond
 	APP_NAME	string		= "shitenno"
 	DEFAULT_CONF	types.Path	= "/etc/shitenno.conf"
 	DEFAULT_PRIO	syslog.Priority	= (syslog.LOG_DAEMON|syslog.LOG_WARNING)
@@ -224,23 +224,19 @@ func	(shitenno *Shitenno) SummonMinions() {
 
 
 func	(shitenno *Shitenno) Summon(c *GenericConf, handler Handler) {
-	conn	:= create_socket(shitenno.log, shitenno.SocketPrefix + c.Socket, c.UID, c.GID, shitenno.m_end, shitenno.wg)
-	defer	conn.Close()
-
-	handler.Inject(shitenno.db)
-
 	for {
-		err	:= handler.Serve(conn)
+		conn	:= create_socket(shitenno.log, shitenno.SocketPrefix + c.Socket, c.UID, c.GID, shitenno.m_end, shitenno.wg)
+		handler.Inject(shitenno.db)
 
-		switch err {
-		case nil:
+
+		switch	err := handler.Serve(conn); err {
+		case	nil:
 			shitenno.log.Printf("Respawn %s for no reason", c.Socket)
 
-		default:
-			if _,ok := err.(*EOConn); ok {
-				return
-			}
+		case	io.EOF:
+			return
 
+		default:
 			shitenno.log.Printf("Respawn %s : %s", c.Socket, err.Error() )
 		}
 	}

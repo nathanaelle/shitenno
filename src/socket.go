@@ -1,6 +1,7 @@
 package	main
 
 import	(
+	"io"
 	"os"
 	"log"
 	"net"
@@ -17,9 +18,6 @@ type	(
 		wg	*sync.WaitGroup
 	}
 
-	EOConn struct {
-	}
-
 
 	Conn	struct {
 		net.Conn
@@ -28,18 +26,6 @@ type	(
 	}
 
 )
-
-func (_ *EOConn) Error() string {
-	return "end of connection"
-}
-
-func (_ *EOConn) Timeout() bool {
-	return true
-}
-
-func (_ *EOConn) Temporary() bool {
-	return false
-}
 
 
 func	create_socket(l *log.Logger, socket string, uid,gid int, end <-chan struct{},wg *sync.WaitGroup) *Listener {
@@ -73,10 +59,10 @@ func (lst *Listener)Accept() (net.Conn,error) {
 	for {
 		select {
 		case	<-lst.end:
-			return nil,new(EOConn)
+			return nil,io.EOF
 
 		default:
-			lst.SetDeadline(time.Now().Add(LISTEN_EXPIRE))
+			lst.SetDeadline(time.Now().Add(IO_TIMEOUT))
 			fd,err := lst.UnixListener.Accept()
 			switch	{
 			case	err == nil:
@@ -106,10 +92,10 @@ func (conn *Conn) Read(b []byte) (n int, err error) {
 	for {
 		select {
 		case	<-conn.end:
-			return 0,new(EOConn)
+			return 0,io.EOF
 
 		default:
-			conn.SetReadDeadline(time.Now().Add(LISTEN_EXPIRE))
+			conn.SetReadDeadline(time.Now().Add(IO_TIMEOUT))
 			n1,err = conn.Conn.Read(b[n:])
 			n+=n1
 			if err == nil || n == len(b) {

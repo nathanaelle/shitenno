@@ -18,7 +18,10 @@ import	(
 	"golang.org/x/crypto/ocsp"
 )
 
-const	MaxConn	int	= 40
+const	(
+	MaxConn		int	= 40
+)
+
 
 type	(
 

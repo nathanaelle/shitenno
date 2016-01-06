@@ -5,6 +5,7 @@ import	(
 	"log"
 	"net"
 	"time"
+	"sync"
 )
 
 
@@ -13,6 +14,7 @@ type	(
 	Listener struct {
 		*net.UnixListener
 		end	<-chan struct{}
+		wg	*sync.WaitGroup
 	}
 
 	EOConn struct {
@@ -22,6 +24,7 @@ type	(
 	Conn	struct {
 		net.Conn
 		end	<-chan struct{}
+		wg	*sync.WaitGroup
 	}
 
 )
@@ -39,7 +42,7 @@ func (_ *EOConn) Temporary() bool {
 }
 
 
-func	create_socket(l *log.Logger, socket string, uid,gid int, end <-chan struct{}) *Listener {
+func	create_socket(l *log.Logger, socket string, uid,gid int, end <-chan struct{},wg *sync.WaitGroup) *Listener {
 	conn, err := net.ListenUnix("unix",  &net.UnixAddr { socket, "unix" } )
 	for err != nil {
 		switch	err.(type) {
@@ -61,7 +64,8 @@ func	create_socket(l *log.Logger, socket string, uid,gid int, end <-chan struct{
 	}
 	os.Chown(socket, uid, gid)
 
-	return	&Listener{ conn, end }
+	wg.Add(1)
+	return	&Listener{ conn, end, wg }
 }
 
 
@@ -76,7 +80,8 @@ func (lst *Listener)Accept() (net.Conn,error) {
 			fd,err := lst.UnixListener.Accept()
 			switch	{
 			case	err == nil:
-				return &Conn{ fd, lst.end }, nil
+				lst.wg.Add(1)
+				return &Conn{ fd, lst.end, lst.wg }, nil
 
 			default:
 				if nerr,ok := err.(net.Error); !ok || !nerr.Timeout() {
@@ -87,8 +92,15 @@ func (lst *Listener)Accept() (net.Conn,error) {
 	}
 }
 
+func (lst *Listener)Close() (err error) {
+	err = lst.UnixListener.Close()
+	lst.wg.Done()
+	return
+}
 
-func (conn Conn) Read(b []byte) (n int, err error) {
+
+
+func (conn *Conn) Read(b []byte) (n int, err error) {
 	n1 := 0
 
 	for {
@@ -101,6 +113,7 @@ func (conn Conn) Read(b []byte) (n int, err error) {
 			n1,err = conn.Conn.Read(b[n:])
 			n+=n1
 			if err == nil || n == len(b) {
+				conn.SetReadDeadline(time.Now().Add(time.Hour))
 				return n,nil
 			}
 
@@ -109,4 +122,10 @@ func (conn Conn) Read(b []byte) (n int, err error) {
 			}
 		}
 	}
+}
+
+func (conn *Conn)Close() (err error) {
+	err = conn.Conn.Close()
+	conn.wg.Done()
+	return
 }

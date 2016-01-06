@@ -224,10 +224,7 @@ func	(shitenno *Shitenno) SummonMinions() {
 
 
 func	(shitenno *Shitenno) Summon(c *GenericConf, handler Handler) {
-	shitenno.wg.Add(1)
-	defer	shitenno.wg.Done()
-
-	conn	:= create_socket(shitenno.log, shitenno.SocketPrefix + c.Socket, c.UID, c.GID, shitenno.m_end)
+	conn	:= create_socket(shitenno.log, shitenno.SocketPrefix + c.Socket, c.UID, c.GID, shitenno.m_end, shitenno.wg)
 	defer	conn.Close()
 
 	handler.Inject(shitenno.db)

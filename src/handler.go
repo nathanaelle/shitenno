@@ -19,16 +19,14 @@ type	(
 	}
 
 	BuffHandler	struct{
-		Handler		func(db *HTTPDB, read *bufio.Scanner, write func([]byte))
+		Handler		func(db *HTTPDB, read *bufio.Scanner, write func([]byte)) error
 		Transport	Transport
-		End		<-chan bool
 		db		*HTTPDB
 	}
 
 
 	HttpHandler	struct{
 		http.Server
-		End		<-chan bool
 		db		*HTTPDB
 	}
 )
@@ -132,19 +130,13 @@ func	(h *BuffHandler) Inject(db *HTTPDB) {
 
 func	(h *BuffHandler) Serve(l net.Listener) error {
 	for {
-		select {
-		case	<-h.End:
-			return nil
+		fd,err := l.Accept()
 
-		default:
-			fd,err := l.Accept()
-
-			if	err != nil {
-				return err
-			}
-
-			go h.cope_with(fd)
+		if	err != nil {
+			return err
 		}
+
+		go h.cope_with(fd)
 	}
 }
 
@@ -159,13 +151,23 @@ func	(h *BuffHandler) cope_with(con net.Conn) {
 	scan	:= bufio.NewScanner(con)
 	scan.Split(h.Transport.Decode)
 
-	h.Handler(h.db, scan, func(d []byte){
+	err := h.Handler(h.db, scan, func(d []byte){
 		con.Write(h.Transport.Encode(d))
 	})
+
+	if err == nil {
+		return
+	}
+
+	if _,ok := err.(*EOConn); ok {
+		return
+	}
+
+	panic(err)
 }
 
 
-func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) {
+func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
 	for decoder.Scan() {
 		msg	:= bytes.SplitN(decoder.Bytes(), []byte{' '}, 2)
 
@@ -199,14 +201,12 @@ func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) {
 		}
 	}
 
-	if err := decoder.Err(); err != nil {
-		panic(err)
-	}
+	return decoder.Err()
 }
 
 
 
-func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) {
+func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
 	for decoder.Scan() {
 		data	:= decoder.Bytes()
 
@@ -253,7 +253,5 @@ func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) {
 
 	}
 
-	if err := decoder.Err(); err != nil {
-		panic(err)
-	}
+	return decoder.Err()
 }

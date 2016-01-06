@@ -4,7 +4,6 @@ package	main
 import	(
 	"fmt"
 	"net"
-	"time"
 	"bytes"
 	"bufio"
 	"errors"
@@ -15,12 +14,12 @@ import	(
 
 type	(
 	Handler	interface {
-		Serve(*net.UnixListener) error
+		Serve(net.Listener) error
 		Inject(*HTTPDB)
 	}
 
 	BuffHandler	struct{
-		Handler		func(db *HTTPDB, read *bufio.Scanner, write func([]byte), set_expire func())
+		Handler		func(db *HTTPDB, read *bufio.Scanner, write func([]byte))
 		Transport	Transport
 		End		<-chan bool
 		db		*HTTPDB
@@ -43,7 +42,7 @@ func	(h *HttpHandler) Inject(db *HTTPDB) {
 func	(h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
 	defer	func() {
 		if r := recover(); r != nil {
-			fmt.Printf("panic recovered for %s\n", r)
+			exterminate(r.(error))
 		}
 	}()
 
@@ -119,9 +118,8 @@ func	(h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
 }
 
 
-func	(h *HttpHandler) Serve(l *net.UnixListener) error {
+func	(h *HttpHandler) Serve(l net.Listener) error {
 	h.Server.Handler = http.HandlerFunc(h.ServeHTTP)
-	//h.Server.ReadTimeout = DEFAULT_EXPIRE
 
 	return h.Server.Serve(l)
 }
@@ -132,24 +130,20 @@ func	(h *BuffHandler) Inject(db *HTTPDB) {
 }
 
 
-func	(h *BuffHandler) Serve(l *net.UnixListener) error {
+func	(h *BuffHandler) Serve(l net.Listener) error {
 	for {
 		select {
 		case	<-h.End:
 			return nil
 
 		default:
-			l.SetDeadline(time.Now().Add(LISTEN_EXPIRE))
 			fd,err := l.Accept()
-			switch	{
-			case	err == nil:
-				go h.cope_with(fd)
 
-			default:
-				if nerr,ok := err.(net.Error); !ok || !nerr.Timeout() {
-					return err
-				}
+			if	err != nil {
+				return err
 			}
+
+			go h.cope_with(fd)
 		}
 	}
 }
@@ -158,7 +152,7 @@ func	(h *BuffHandler) cope_with(con net.Conn) {
 	defer	func() {
 		con.Close()
 		if r := recover(); r != nil {
-			fmt.Printf("panic recovered for %s", r)
+			exterminate(r.(error))
 		}
 	}()
 
@@ -167,15 +161,12 @@ func	(h *BuffHandler) cope_with(con net.Conn) {
 
 	h.Handler(h.db, scan, func(d []byte){
 		con.Write(h.Transport.Encode(d))
-	},func(){
-		con.SetDeadline(time.Now().Add(CONN_EXPIRE))
 	})
 }
 
 
-func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte), set_expire func()) {
+func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) {
 	for decoder.Scan() {
-		set_expire()
 		msg	:= bytes.SplitN(decoder.Bytes(), []byte{' '}, 2)
 
 		res,err	:= db.Request(&Query{
@@ -206,27 +197,17 @@ func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte), set_expire
 			encoder([]byte("TIMEOUT error in backend"))
 			panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
 		}
-
-		set_expire()
 	}
 
-	err := decoder.Err()
-	if err == nil {
-		return
+	if err := decoder.Err(); err != nil {
+		panic(err)
 	}
-
-	if nerr,ok := err.(net.Error); !ok || !nerr.Timeout() {
-		return
-	}
-
-	panic(err)
 }
 
 
 
-func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte), set_expire func()) {
+func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) {
 	for decoder.Scan() {
-		set_expire()
 		data	:= decoder.Bytes()
 
 		if data[0] == 'H' {
@@ -270,17 +251,9 @@ func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte), set_expire
 			panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
 		}
 
-		set_expire()
 	}
 
-	err := decoder.Err()
-	if err == nil {
-		return
+	if err := decoder.Err(); err != nil {
+		panic(err)
 	}
-
-	if nerr,ok := err.(net.Error); !ok || !nerr.Timeout() {
-		return
-	}
-
-	panic(err)
 }

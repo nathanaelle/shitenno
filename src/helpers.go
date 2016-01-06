@@ -3,7 +3,7 @@ package	main
 import	(
 	"os"
 	"log"
-	"net"
+	"reflect"
 	"syscall"
 	"os/signal"
 )
@@ -38,27 +38,36 @@ func SignalCatcher() (<-chan bool,<-chan bool)  {
 }
 
 
-func	create_socket(l *log.Logger, socket string, uid,gid int) *net.UnixListener {
-	conn, err := net.ListenUnix("unix",  &net.UnixAddr { socket, "unix" } )
-	for err != nil {
-		switch	err.(type) {
-			case	*net.OpError:
-				if err.(*net.OpError).Err.Error() != "bind: address already in use" {
-					l.Printf( "Listen %s : %s", socket , err )
-				}
+func exterminate(err error)  {
+	var s reflect.Value
 
-			default:
-				l.Printf( "Listen %s : %s", socket , err )
-		}
-
-		if _, r_err := os.Stat(socket); r_err != nil {
-			l.Printf( "Lstat %s : %s", socket , err )
-		}
-		os.Remove(socket)
-
-		conn, err = net.ListenUnix("unix",  &net.UnixAddr { socket, "unix" } )
+	if err == nil {
+		return
 	}
-	os.Chown(socket, uid, gid)
 
-	return	conn
+	s_t	:= reflect.ValueOf(err)
+
+	for  s_t.Kind() == reflect.Ptr {
+		s_t = s_t.Elem()
+	}
+
+	switch s_t.Kind() {
+		case reflect.Interface:	s = s_t.Elem()
+		default:		s = s_t
+	}
+
+	typeOfT := s.Type()
+	pkg	:= typeOfT.PkgPath() + "/" + typeOfT.Name()
+
+	log.Printf("\n------------------------------------\nKind : %d %d\n%s\n\n", s_t.Kind(), s.Kind(), err.Error())
+
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		if f.CanInterface() {
+			log.Printf("%s %d: %s %s = %v\n", pkg, i, typeOfT.Field(i).Name, f.Type(), f.Interface())
+		} else {
+			log.Printf("%s %d: %s %s = %s\n", pkg, i, typeOfT.Field(i).Name, f.Type(), f.String())
+		}
+	}
+
 }

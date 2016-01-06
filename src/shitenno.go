@@ -39,7 +39,7 @@ type	(
 
 		end		<-chan bool
 		update		<-chan bool
-		m_end		chan bool
+		m_end		chan struct{}
 	}
 
 	GenericConf struct {
@@ -200,17 +200,15 @@ func	(shitenno *Shitenno) End()  {
 
 
 func	(shitenno *Shitenno) SummonMinions() {
-	shitenno.m_end	= make(chan bool)
+	shitenno.m_end	= make(chan struct{})
 
 	if shitenno.Nginx != nil {
 		go shitenno.Summon(shitenno.Nginx, &HttpHandler {
-			End:		shitenno.m_end,
 		})
 	}
 
 	if shitenno.Postfix != nil {
 		go shitenno.Summon(shitenno.Postfix, &BuffHandler {
-			End:		shitenno.m_end,
 			Transport:	T_NetString,
 			Handler:	postfix,
 		})
@@ -218,7 +216,6 @@ func	(shitenno *Shitenno) SummonMinions() {
 
 	if shitenno.DoveCot != nil {
 		go shitenno.Summon(shitenno.DoveCot, &BuffHandler {
-			End:		shitenno.m_end,
 			Transport:	T_DoveDict,
 			Handler:	dovecot,
 		})
@@ -226,17 +223,28 @@ func	(shitenno *Shitenno) SummonMinions() {
 }
 
 
-func	(s *Shitenno) Summon(c *GenericConf, handler Handler) {
-	s.wg.Add(1)
-	defer	s.wg.Done()
+func	(shitenno *Shitenno) Summon(c *GenericConf, handler Handler) {
+	shitenno.wg.Add(1)
+	defer	shitenno.wg.Done()
 
-	conn	:= create_socket(s.log, s.SocketPrefix + c.Socket, c.UID, c.GID)
+	conn	:= create_socket(shitenno.log, shitenno.SocketPrefix + c.Socket, c.UID, c.GID, shitenno.m_end)
 	defer	conn.Close()
 
-	handler.Inject(s.db)
+	handler.Inject(shitenno.db)
 
-	err	:= handler.Serve(conn)
-	if err != nil {
-		panic(err)
+	for {
+		err	:= handler.Serve(conn)
+
+		switch err {
+		case nil:
+			shitenno.log.Printf("Respawn %s for no reason", c.Socket)
+
+		default:
+			if _,ok := err.(*EOConn); ok {
+				return
+			}
+
+			shitenno.log.Printf("Respawn %s : %s", c.Socket, err.Error() )
+		}
 	}
 }

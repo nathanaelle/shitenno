@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+#export	DH_VERBOSE=1
+export	DH_OPTIONS
+export	DH_GOPKG=github.com/nathanaelle/shitenno
+
+export	GO15VENDOREXPERIMENT=1
+export	GOOS=$(shell dpkg-architecture -qDEB_BUILD_ARCH_OS)
+export	GOARCH=$(shell dpkg-architecture -qDEB_BUILD_ARCH)
+
+
+override_dh_auto_build:
+	go build -o shitenno src/*.go
+
+# the only way to avoid the copy of the source tree
+override_dh_auto_install:
+
+override_dh_auto_test:
+
+%:
+	dh $@ --buildsystem=golang --with=golang

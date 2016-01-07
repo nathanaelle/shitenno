@@ -1,0 +1,9 @@
+description "shitenno mail unified proxy daemon"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+console log
+respawn
+
+exec /usr/sbin/shitenno

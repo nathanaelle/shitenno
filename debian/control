@@ -1,0 +1,25 @@
+Source: shitenno
+Section: admin
+Priority: extra
+Maintainer: Nathanaelle <nathanaelle@users.noreply.github.com>
+Build-Depends: debhelper (>= 9), golang-go (>=1.5), dh-golang
+Standards-Version: 3.9.1
+Homepage: http://github.com/nathanaelle/shitenno
+Vcs-Browser: http://github.com/nathanaelle/shitenno
+Vcs-Git: http://github.com/nathanaelle/shitenno
+
+Package: shitenno
+Architecture: amd64 armhf
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Built-Using: ${misc:Built-Using}
+Suggests: shitenno-conf
+Description: unified proxy for mail plateform
+ unified proxy for nginx mail / postfix / dovecot
+
+Package: shitenno-default-conf
+Architecture: all
+Depends: shitenno
+Conflicts: shitenno-conf
+Provides: shitenno-conf
+Description: unified proxy for mail plateform - default conf & docs
+ unified proxy for nginx mail / postfix / dovecot

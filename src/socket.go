@@ -103,7 +103,7 @@ func (conn *Conn) Read(b []byte) (n int, err error) {
 				return n,nil
 			}
 
-			if nerr,ok := err.(net.Error); !ok || !nerr.Timeout() {
+			if nerr,ok := err.(net.Error); !ok || !(nerr.Timeout() && nerr.Temporary()) {
 				return
 			}
 		}

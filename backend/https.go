@@ -1,4 +1,4 @@
-package lib
+package backend
 
 import (
 	"bytes"
@@ -22,18 +22,6 @@ const (
 )
 
 type (
-	Reply struct {
-		Verb   string      `json:"verb"`
-		Object interface{} `json:"object"`
-		Status string      `json:"status"`
-		Data   interface{} `json:"data"`
-	}
-
-	Query struct {
-		Verb   string      `json:"verb"`
-		Object interface{} `json:"object"`
-	}
-
 	HTTPDB struct {
 		sni        string
 		url        string

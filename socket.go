@@ -1,4 +1,4 @@
-package lib
+package shitenno
 
 import (
 	"io"
@@ -65,7 +65,7 @@ func (lst *Listener) Accept() (net.Conn, error) {
 			return nil, io.EOF
 
 		default:
-			lst.SetDeadline(time.Now().Add(IO_TIMEOUT))
+			lst.SetDeadline(time.Now().Add(IOTimeOut))
 			fd, err := lst.UnixListener.Accept()
 			switch {
 			case err == nil:
@@ -97,7 +97,7 @@ func (conn *Conn) Read(b []byte) (n int, err error) {
 			return 0, io.EOF
 
 		default:
-			conn.SetReadDeadline(time.Now().Add(IO_TIMEOUT))
+			conn.SetReadDeadline(time.Now().Add(IOTimeOut))
 			n1, err = conn.Conn.Read(b[n:])
 			n += n1
 			if err == nil || n == len(b) {

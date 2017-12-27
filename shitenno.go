@@ -1,4 +1,4 @@
-package main
+package shitenno
 
 import (
 	"flag"
@@ -12,14 +12,16 @@ import (
 
 	"github.com/naoina/toml"
 
+	backend "github.com/nathanaelle/shitenno/backend"
 	syslog "github.com/nathanaelle/syslog5424"
 	types "github.com/nathanaelle/useful.types"
 )
 
 type (
 	Shitenno struct {
-		DevLog   *types.Path
-		Priority *syslog.Priority
+		SyslogDest string
+		DevLog     *types.Path
+		Priority   *syslog.Priority
 
 		RemoteURL    string
 		SocketPrefix string
@@ -32,14 +34,14 @@ type (
 		DoveCot *GenericConf
 
 		wg *sync.WaitGroup
-		db *HTTPDB
+		db *backend.HTTPDB
 
 		syslog *syslog.Syslog
 		log    *log.Logger
 
 		end    <-chan bool
 		update <-chan bool
-		m_end  chan struct{}
+		mEnd   chan struct{}
 	}
 
 	GenericConf struct {
@@ -50,42 +52,42 @@ type (
 )
 
 const (
-	IO_TIMEOUT   time.Duration   = 200 * time.Millisecond
-	APP_NAME     string          = "shitenno"
-	DEFAULT_CONF types.Path      = "/etc/shitenno.conf"
-	DEFAULT_PRIO syslog.Priority = (syslog.LOG_DAEMON | syslog.LOG_WARNING)
+	IOTimeOut   time.Duration   = 200 * time.Millisecond
+	AppName     string          = "shitenno"
+	DefaultConf types.Path      = "/etc/shitenno.conf"
+	DefaultPrio syslog.Priority = (syslog.LOG_DAEMON | syslog.LOG_WARNING)
 )
 
 func SummonShitenno() *Shitenno {
 	var priority *syslog.Priority
 
-	conf_path := new(types.Path)
-	*conf_path = DEFAULT_CONF
+	confPath := new(types.Path)
+	*confPath = DefaultConf
 
-	num_cpu := flag.Int("cpu", 1, "maximum number of logical CPU that can be executed simultaneously")
+	numCPU := flag.Int("cpu", 1, "maximum number of logical CPU that can be executed simultaneously")
 	stderr := flag.Bool("stderr", false, "optional overwrite of DevLog with stderr")
-	opt_prio := flag.String("priority", "", "optional overwrite of log priority in syslog format facility.severity")
-	flag.Var(conf_path, "conf", "path to the director")
+	optPrio := flag.String("priority", "", "optional overwrite of log priority in syslog format facility.severity")
+	flag.Var(confPath, "conf", "path to the director")
 
 	flag.Parse()
 
 	// TODO flag knows nothing about nil `value Value`
 	// TODO so this empty string is an ugly way to detect the "I don't want any default value"
-	if *opt_prio != "" {
+	if *optPrio != "" {
 		priority = new(syslog.Priority)
-		err := priority.Set(*opt_prio)
+		err := priority.Set(*optPrio)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	switch {
-	case *num_cpu > runtime.NumCPU():
+	case *numCPU > runtime.NumCPU():
 		runtime.GOMAXPROCS(runtime.NumCPU())
-	case *num_cpu < 1:
+	case *numCPU < 1:
 		runtime.GOMAXPROCS(1)
 	default:
-		runtime.GOMAXPROCS(*num_cpu)
+		runtime.GOMAXPROCS(*numCPU)
 	}
 
 	conf := &Shitenno{
@@ -94,7 +96,7 @@ func SummonShitenno() *Shitenno {
 		wg: new(sync.WaitGroup),
 	}
 
-	f, err := os.Open(conf_path.String())
+	f, err := os.Open(confPath.String())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,7 +113,7 @@ func SummonShitenno() *Shitenno {
 		log.Fatal(err)
 	}
 
-	conf.db, err = NewDB(conf.RemoteURL, conf.CertPool, conf.ClientCert, conf.HPKP)
+	conf.db, err = backend.NewDB(conf.RemoteURL, conf.CertPool, conf.ClientCert, conf.HPKP)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,42 +136,39 @@ func SummonShitenno() *Shitenno {
 
 	case priority == nil && conf.Priority == nil:
 		conf.Priority = new(syslog.Priority)
-		*conf.Priority = DEFAULT_PRIO
+		*conf.Priority = DefaultPrio
 	}
 
 	switch {
 	case *stderr:
-		co, err := (syslog.Dialer{
-			QueueLen:   100,
-			FlushDelay: 10 * time.Millisecond,
-		}).Dial("stdio", "stderr", new(syslog.T_LFENDED))
+		co, errChan, err := (syslog.Dialer{
+			FlushDelay: 100 * time.Millisecond,
+		}).Dial("stdio", "stderr", syslog.T_LFENDED)
 
 		if err != nil {
 			log.Fatal(err)
 		}
-		conf.syslog, _ = syslog.New(co, *conf.Priority, APP_NAME)
+		conf.syslog, _ = syslog.New(co, *conf.Priority, AppName)
 
 	case !*stderr && conf.DevLog != nil:
-		co, err := (syslog.Dialer{
-			QueueLen:   100,
+		co, errChan, err := (syslog.Dialer{
 			FlushDelay: 500 * time.Millisecond,
-		}).Dial("local", conf.DevLog.String(), new(syslog.T_ZEROENDED))
+		}).Dial("local", conf.DevLog.String(), syslog.T_ZEROENDED)
 
 		if err != nil {
 			log.Fatal(err)
 		}
-		conf.syslog, _ = syslog.New(co, *conf.Priority, APP_NAME)
+		conf.syslog, _ = syslog.New(co, *conf.Priority, AppName)
 
 	case !*stderr && conf.DevLog == nil:
-		co, err := (syslog.Dialer{
-			QueueLen:   100,
+		co, errChan, err := (syslog.Dialer{
 			FlushDelay: 500 * time.Millisecond,
-		}).Dial("local", "/dev/log", new(syslog.T_ZEROENDED))
+		}).Dial("local", "", syslog.T_ZEROENDED)
 
 		if err != nil {
 			log.Fatal(err)
 		}
-		conf.syslog, _ = syslog.New(co, *conf.Priority, APP_NAME)
+		conf.syslog, _ = syslog.New(co, *conf.Priority, AppName)
 	}
 
 	conf.log = conf.syslog.Channel(syslog.LOG_INFO).Logger("")
@@ -183,22 +182,22 @@ func (shitenno *Shitenno) End() {
 	for {
 		select {
 		case <-shitenno.end:
-			close(shitenno.m_end)
+			close(shitenno.mEnd)
 			shitenno.log.Println("Waiting")
 			shitenno.wg.Wait()
 			return
 
 		// TODO update process is quite ugly
 		case <-shitenno.update:
-			close(shitenno.m_end)
-			shitenno.SummonMinions()
+			close(shitenno.mEnd)
+			shitenno.SummonGardians()
 		}
 
 	}
 }
 
-func (shitenno *Shitenno) SummonMinions() {
-	shitenno.m_end = make(chan struct{})
+func (shitenno *Shitenno) SummonGardians() {
+	shitenno.mEnd = make(chan struct{})
 
 	if shitenno.Nginx != nil {
 		go shitenno.Summon(shitenno.Nginx, &HttpHandler{})
@@ -221,7 +220,7 @@ func (shitenno *Shitenno) SummonMinions() {
 
 func (shitenno *Shitenno) Summon(c *GenericConf, handler Handler) {
 	for {
-		conn := create_socket(shitenno.log, shitenno.SocketPrefix+c.Socket, c.UID, c.GID, shitenno.m_end, shitenno.wg)
+		conn := create_socket(shitenno.log, shitenno.SocketPrefix+c.Socket, c.UID, c.GID, shitenno.mEnd, shitenno.wg)
 		handler.Inject(shitenno.db)
 
 		switch err := handler.Serve(conn); err {

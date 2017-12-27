@@ -1,13 +1,13 @@
 package main
 
-import	(
+import (
+	"github.com/nathanaelle/shitenno"
 )
 
+func main() {
+	shitenno := shitenno.SummonShitenno()
 
-func	main()  {
-	shitenno	:= SummonShitenno()
-
-	shitenno.SummonMinions()
+	shitenno.SummonGardians()
 
 	shitenno.End()
 }

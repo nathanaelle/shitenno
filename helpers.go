@@ -1,21 +1,19 @@
-package	main
+package lib
 
-import	(
-	"os"
+import (
 	"log"
+	"os"
+	"os/signal"
 	"reflect"
 	"syscall"
-	"os/signal"
 )
 
-
-
-func SignalCatcher() (<-chan bool,<-chan bool)  {
-	end	:= make(chan bool)
-	update	:= make(chan bool)
+func SignalCatcher() (<-chan bool, <-chan bool) {
+	end := make(chan bool)
+	update := make(chan bool)
 
 	go func() {
-		signalChannel	:= make(chan os.Signal)
+		signalChannel := make(chan os.Signal)
 
 		signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
@@ -34,32 +32,33 @@ func SignalCatcher() (<-chan bool,<-chan bool)  {
 		}
 	}()
 
-	return end,update
+	return end, update
 }
 
-
-func exterminate(err error)  {
+func exterminate(err error) {
 	var s reflect.Value
 
 	if err == nil {
 		return
 	}
 
-	s_t	:= reflect.ValueOf(err)
+	valErr := reflect.ValueOf(err)
 
-	for  s_t.Kind() == reflect.Ptr {
-		s_t = s_t.Elem()
+	for valErr.Kind() == reflect.Ptr {
+		valErr = valErr.Elem()
 	}
 
-	switch s_t.Kind() {
-		case reflect.Interface:	s = s_t.Elem()
-		default:		s = s_t
+	switch valErr.Kind() {
+	case reflect.Interface:
+		s = valErr.Elem()
+	default:
+		s = valErr
 	}
 
 	typeOfT := s.Type()
-	pkg	:= typeOfT.PkgPath() + "/" + typeOfT.Name()
+	pkg := typeOfT.PkgPath() + "/" + typeOfT.Name()
 
-	log.Printf("\n------------------------------------\nKind : %d %d\n%s\n\n", s_t.Kind(), s.Kind(), err.Error())
+	log.Printf("\n------------------------------------\nKind : %d %d\n%s\n\n", valErr.Kind(), s.Kind(), err.Error())
 
 	for i := 0; i < s.NumField(); i++ {
 		f := s.Field(i)

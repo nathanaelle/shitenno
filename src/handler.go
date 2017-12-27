@@ -1,66 +1,60 @@
-package	main
+package lib
 
-
-import	(
-	"io"
-	"fmt"
-	"net"
-	"bytes"
+import (
 	"bufio"
-	"errors"
-	"net/http"
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
 )
 
-
-type	(
-	Handler	interface {
+type (
+	Handler interface {
 		Serve(net.Listener) error
 		Inject(*HTTPDB)
 	}
 
-	BuffHandler	struct{
-		Handler		func(db *HTTPDB, read *bufio.Scanner, write func([]byte)) error
-		Transport	Transport
-		db		*HTTPDB
+	BuffHandler struct {
+		Handler   func(db *HTTPDB, read *bufio.Scanner, write func([]byte)) error
+		Transport Transport
+		db        *HTTPDB
 	}
 
-
-	HttpHandler	struct{
+	HttpHandler struct {
 		http.Server
-		db		*HTTPDB
+		db *HTTPDB
 	}
 )
 
-
-func	(h *HttpHandler) Inject(db *HTTPDB) {
-	h.db	= db
+func (h *HttpHandler) Inject(db *HTTPDB) {
+	h.db = db
 }
 
-
-func	(h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
-	defer	func() {
+func (h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
+	defer func() {
 		if r := recover(); r != nil {
 			exterminate(r.(error))
 		}
 	}()
 
-	ht	:= map[string]string{
-		"auth-user":		"user",
-		"auth-pass":		"pass",
-		"auth-protocol":	"protocol",
-		"auth-login-attempt":	"attempt",
-		"client-ip":		"client",
+	ht := map[string]string{
+		"auth-user":          "user",
+		"auth-pass":          "pass",
+		"auth-protocol":      "protocol",
+		"auth-login-attempt": "attempt",
+		"client-ip":          "client",
 	}
-	data	:= make(map[string]string)
+	data := make(map[string]string)
 
-	for _,h := range []string{ "auth-user", "auth-pass", "auth-protocol", "auth-login-attempt", "client-ip" } {
+	for _, h := range []string{"auth-user", "auth-pass", "auth-protocol", "auth-login-attempt", "client-ip"} {
 		data[ht[h]] = hreq.Header.Get(h)
 	}
 
-	res,err	:= h.db.Request(&Query{
-		Verb:	"nginx",
-		Object:	data,
+	res, err := h.db.Request(&Query{
+		Verb:   "nginx",
+		Object: data,
 	})
 
 	if err != nil {
@@ -70,16 +64,15 @@ func	(h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
 
 	switch res.Status {
 	case "OK":
-		switch	data := res.Data.(type) {
-		case	map[string]interface{}:
-			r_data	:= map[string]string{
-				"Auth-Status" : "OK",
-				"Auth-Server" : data["host"].(string),
-				"Auth-Port"   : data["port"].(string),
-
+		switch data := res.Data.(type) {
+		case map[string]interface{}:
+			r_data := map[string]string{
+				"Auth-Status": "OK",
+				"Auth-Server": data["host"].(string),
+				"Auth-Port":   data["port"].(string),
 			}
 
-			for h,v:= range r_data {
+			for h, v := range r_data {
 				hres.Header().Set(h, v)
 			}
 
@@ -87,18 +80,18 @@ func	(h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
 
 		default:
 			hres.WriteHeader(http.StatusInternalServerError)
-			panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+			panic(fmt.Errorf("strange Resp %+v", res))
 		}
 
 	case "KO":
-		switch	res.Data.(type) {
-		case	map[string]interface{}:
-			r_data	:= map[string]string{
-				"Auth-Status" : "Invalid login or password",
-				"Auth-Wait"   : "5",
+		switch res.Data.(type) {
+		case map[string]interface{}:
+			r_data := map[string]string{
+				"Auth-Status": "Invalid login or password",
+				"Auth-Wait":   "5",
 			}
 
-			for h,v:= range r_data {
+			for h, v := range r_data {
 				hres.Header().Set(h, v)
 			}
 
@@ -106,36 +99,33 @@ func	(h *HttpHandler) ServeHTTP(hres http.ResponseWriter, hreq *http.Request) {
 
 		default:
 			hres.WriteHeader(http.StatusInternalServerError)
-			panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+			panic(fmt.Errorf("strange Resp %+v", res))
 		}
 
 	default:
 		hres.WriteHeader(http.StatusInternalServerError)
-		panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+		panic(fmt.Errorf("strange Resp %+v", res))
 	}
 
 }
 
-
-func	(h *HttpHandler) Serve(l net.Listener) error {
+func (h *HttpHandler) Serve(l net.Listener) error {
 	h.Server.Handler = http.HandlerFunc(h.ServeHTTP)
 
 	return h.Server.Serve(l)
 }
 
-
-func	(h *BuffHandler) Inject(db *HTTPDB) {
-	h.db	= db
+func (h *BuffHandler) Inject(db *HTTPDB) {
+	h.db = db
 }
 
-
-func	(h *BuffHandler) Serve(l net.Listener) error {
-	defer	l.Close()
+func (h *BuffHandler) Serve(l net.Listener) error {
+	defer l.Close()
 
 	for {
-		fd,err := l.Accept()
+		fd, err := l.Accept()
 
-		if	err != nil {
+		if err != nil {
 			return err
 		}
 
@@ -143,57 +133,56 @@ func	(h *BuffHandler) Serve(l net.Listener) error {
 	}
 }
 
-func	(h *BuffHandler) cope_with(con net.Conn) {
-	defer	func() {
+func (h *BuffHandler) cope_with(con net.Conn) {
+	defer func() {
 		con.Close()
 		if r := recover(); r != nil {
 			exterminate(r.(error))
 		}
 	}()
 
-	scan	:= bufio.NewScanner(con)
+	scan := bufio.NewScanner(con)
 	scan.Split(h.Transport.Decode)
 
-	err := h.Handler(h.db, scan, func(d []byte){
+	err := h.Handler(h.db, scan, func(d []byte) {
 		con.Write(h.Transport.Encode(d))
 	})
 
 	switch err {
-	case	nil:
+	case nil:
 		return
 
-	case	io.EOF:
+	case io.EOF:
 		return
 
 	default:
-		panic(err)
+		return err
 	}
 }
 
-
-func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
+func postfix(db *HTTPDB, decoder *bufio.Scanner, encoder func([]byte)) error {
 	for decoder.Scan() {
-		msg	:= bytes.SplitN(decoder.Bytes(), []byte{' '}, 2)
+		msg := bytes.SplitN(decoder.Bytes(), []byte{' '}, 2)
 
-		res,err	:= db.Request(&Query{
-			Verb:	string(msg[0]),
-			Object:	string(msg[1]),
+		res, err := db.Request(&Query{
+			Verb:   string(msg[0]),
+			Object: string(msg[1]),
 		})
 
 		if err != nil {
 			encoder([]byte("TIMEOUT error in backend"))
-			panic(err)
+			return err
 		}
 
 		switch res.Status {
 		case "OK":
-			switch	data := res.Data.(type) {
-			case	string:
-				encoder([]byte("OK "+data))
+			switch data := res.Data.(type) {
+			case string:
+				encoder([]byte("OK " + data))
 
 			default:
 				encoder([]byte("TIMEOUT error in backend"))
-				panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+				return fmt.Errorf("strange Resp %+v", res)
 			}
 
 		case "KO":
@@ -201,18 +190,16 @@ func postfix(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
 
 		default:
 			encoder([]byte("TIMEOUT error in backend"))
-			panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+			return fmt.Errorf("strange Resp %+v", res)
 		}
 	}
 
 	return decoder.Err()
 }
 
-
-
-func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
+func dovecot(db *HTTPDB, decoder *bufio.Scanner, encoder func([]byte)) error {
 	for decoder.Scan() {
-		data	:= decoder.Bytes()
+		data := decoder.Bytes()
 
 		if data[0] == 'H' {
 			continue
@@ -222,11 +209,11 @@ func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
 			continue
 		}
 
-		msg	:= bytes.SplitN(data[1:], []byte{'/'}, 3)
+		msg := bytes.SplitN(data[1:], []byte{'/'}, 3)
 
-		res,err	:= db.Request(&Query{
-			Verb:	string(msg[1]),
-			Object:	map[string]string{
+		res, err := db.Request(&Query{
+			Verb: string(msg[1]),
+			Object: map[string]string{
 				"context": string(msg[0]),
 				"object":  string(msg[2]),
 			},
@@ -234,25 +221,25 @@ func dovecot(db *HTTPDB, decoder *bufio.Scanner,encoder func([]byte)) error {
 
 		if err != nil {
 			encoder([]byte{'F'})
-			panic(err)
+			return err
 		}
 
 		switch res.Status {
 		case "OK":
-			data,err	:= json.Marshal(res.Data)
+			data, err := json.Marshal(res.Data)
 			if err != nil {
 				encoder([]byte{'F'})
-				panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+				return fmt.Errorf("strange Resp %+v", res)
 			}
 
-			encoder(append([]byte{'O'},data...))
+			encoder(append([]byte{'O'}, data...))
 
 		case "KO":
 			encoder([]byte{'N'})
 
 		default:
 			encoder([]byte{'F'})
-			panic(errors.New(fmt.Sprintf("strange Resp %+v", res )))
+			return fmt.Errorf("strange Resp %+v", res)
 		}
 
 	}

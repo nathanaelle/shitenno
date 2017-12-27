@@ -1,94 +1,86 @@
-package	main
+package lib
 
-import	(
-	"fmt"
+import (
 	"bytes"
-	"errors"
+	"fmt"
 	"strconv"
 )
 
-
-type	(
-	Transport	interface {
+type (
+	// Transport …
+	Transport interface {
 		Encode([]byte) []byte
 		Decode(data []byte, atEOF bool) (int, []byte, error)
 	}
 
-
-	NetString	struct {
+	netString struct {
 	}
 
-	DoveDict	struct {
+	doveDict struct {
 	}
 )
 
 var (
-	T_NetString	= new(NetString)
-	T_DoveDict	= new(DoveDict)
+	// NetString …
+	NetString Transport = new(netString)
+
+	// DoveDict …
+	DoveDict Transport = new(doveDict)
 )
 
-
-
-
-func _next() (int,[]byte,error) {
+func _next() (int, []byte, error) {
 	return 0, nil, nil
 }
 
-func _err(err error) (int,[]byte,error) {
+func _err(err error) (int, []byte, error) {
 	return 0, nil, err
 }
 
-
-
-func (_ *NetString) Encode(data []byte) []byte {
-	return []byte(fmt.Sprintf("%d:%s,",len(data),data))
+func (ns *netString) Encode(data []byte) []byte {
+	return []byte(fmt.Sprintf("%d:%s,", len(data), data))
 }
 
-
-func (_ *NetString) Decode(data []byte, atEOF bool) (int, []byte, error) {
+func (ns *netString) Decode(data []byte, atEOF bool) (int, []byte, error) {
 	if len(data) == 0 {
 		return _next()
 	}
 
-	p_colon	:= bytes.IndexByte(data, ':')
-	if p_colon < 0 {
+	pColon := bytes.IndexByte(data, ':')
+	if pColon < 0 {
 		return _next()
 	}
 
-	size64,err := strconv.ParseInt(string(data[0:p_colon]), 10, 0)
-	size:=int(size64)
+	size64, err := strconv.ParseInt(string(data[0:pColon]), 10, 0)
+	size := int(size64)
 	if err != nil {
 		return _err(err)
 	}
-	p_colon++
+	pColon++
 
-	if len(data) < (size+p_colon+1) {
+	if len(data) < (size + pColon + 1) {
 		return _next()
 	}
 
-	if data[p_colon+size] != ',' {
-		return _err(errors.New(fmt.Sprintf("no , in [%s]", data[0:p_colon+size+1])))
+	if data[pColon+size] != ',' {
+		return _err(fmt.Errorf("no , in [%s]", data[0:pColon+size+1]))
 	}
 
-	return p_colon+size+1, data[p_colon:p_colon+size], nil
+	return pColon + size + 1, data[pColon : pColon+size], nil
 }
 
-
-
-func (_ *DoveDict) Encode(data []byte) []byte {
-	return append(data, '\n' )
+func (dcd *doveDict) Encode(data []byte) []byte {
+	return append(data, '\n')
 }
 
-
-func (_ *DoveDict) Decode(data []byte, atEOF bool) (int, []byte, error) {
+func (dcd *doveDict) Decode(data []byte, atEOF bool) (int, []byte, error) {
 	if len(data) == 0 {
 		return _next()
 	}
 
-	p_nl	:= bytes.IndexByte(data, '\n')
-	if p_nl < 0 {
+	pNl := bytes.IndexByte(data, '\n')
+	if pNl < 0 {
 		return _next()
 	}
 
-	return p_nl+1, data[0:p_nl], nil
+	return pNl + 1, data[0:pNl], nil
 }

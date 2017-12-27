@@ -14,6 +14,12 @@
   version = "v0.1.1"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/nathanaelle/sdialog"
+  packages = ["."]
+  revision = "44c686d1063dfcac0b59f329b1331882770b2870"
+
+[[projects]]
   name = "github.com/nathanaelle/syslog5424"
   packages = [".","sdata"]
   revision = "37ed07a2e441a3f32a26282b9e957acba512bba9"
@@ -34,6 +40,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f4344a03b75c2dd453e8b4d00a818582cb549e17244efff49fda242e35b8636c"
+  inputs-digest = "68c372fe525789f7fc72956773ccc83e889dad73c57a01f62c0526928db2ca6c"
   solver-name = "gps-cdcl"
   solver-version = 1

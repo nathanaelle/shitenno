@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
+	sd "github.com/nathanaelle/sdialog"
 	"github.com/nathanaelle/shitenno"
 	syslog "github.com/nathanaelle/syslog5424"
 	types "github.com/nathanaelle/useful.types"
@@ -56,6 +59,12 @@ func main() {
 		}
 		slog, _ = syslog.New(co, *priority, appName)
 
+		go func() {
+			for e := range errChan {
+				sd.SD_ERR.LogError(e)
+			}
+		}()
+
 	case !*stderr:
 		co, errChan, err := (syslog.Dialer{
 			FlushDelay: 500 * time.Millisecond,
@@ -65,22 +74,36 @@ func main() {
 			log.Fatal(err)
 		}
 		slog, _ = syslog.New(co, *priority, appName)
+
+		go func() {
+			for e := range errChan {
+				sd.SD_ERR.LogError(e)
+			}
+		}()
+
 	}
 
+	wg := new(sync.WaitGroup)
 	end, update := signalCatcher()
 
-	shitenno, err := shitenno.SummonShitenno(confPath, slog, end, update)
+	sd.Notify(sd.Status("Starting…"))
+	if err := sd.Watchdog(end, wg); err != nil {
+		return
+	}
+
+	shitenno, err := shitenno.SummonShitenno(confPath, slog, wg, end.Done(), update)
 	if err != nil {
 		log.Fatal(err)
 	}
+	sd.Notify(sd.MainPid(os.Getpid()), sd.Ready(), sd.Status("Waiting requests…"))
 
 	shitenno.SummonGardians()
 
 	shitenno.End()
 }
 
-func signalCatcher() (<-chan struct{}, <-chan struct{}) {
-	end := make(chan struct{})
+func signalCatcher() (context.Context, <-chan struct{}) {
+	end, cancel := context.WithCancel(context.Background())
 	update := make(chan struct{})
 
 	signalChannel := make(chan os.Signal)
@@ -91,7 +114,7 @@ func signalCatcher() (<-chan struct{}, <-chan struct{}) {
 			switch sig {
 			case os.Interrupt, syscall.SIGTERM:
 				close(signalChannel)
-				close(end)
+				cancel()
 				close(update)
 
 				return

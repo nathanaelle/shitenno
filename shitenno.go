@@ -53,14 +53,14 @@ const (
 	IOTimeOut time.Duration = 200 * time.Millisecond
 )
 
-func SummonShitenno(confPath stringer, slog *syslog.Syslog, end, update <-chan struct{}) (*Shitenno, error) {
+func SummonShitenno(confPath stringer, slog *syslog.Syslog, wg *sync.WaitGroup, end, update <-chan struct{}) (*Shitenno, error) {
 	conf := &Shitenno{
 		SocketPrefix: "/var/run/shitenno.",
 
 		log:    slog.Channel(syslog.LOG_INFO).Logger(""),
 		end:    end,
 		update: update,
-		wg:     new(sync.WaitGroup),
+		wg:     wg,
 	}
 
 	f, err := os.Open(confPath.String())

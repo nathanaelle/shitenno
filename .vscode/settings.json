@@ -1,0 +1,9 @@
+{
+	"go.gopath": "${workspaceRoot}/.GOPATH",
+	"go.testOnSave": true,
+	"go.coverOnSave": true,
+	"go.inferGopath": false,
+	"editor.tabSize": 8,
+	"editor.detectIndentation": false,
+	"editor.insertSpaces": false
+}

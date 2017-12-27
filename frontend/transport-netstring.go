@@ -3,6 +3,7 @@ package frontend
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -12,12 +13,20 @@ type (
 )
 
 var (
-	// NetString …
+	// NetString implementation : https://en.wikipedia.org/wiki/Netstring
 	NetString Transport = new(netString)
 )
 
 func (ns *netString) Encode(data []byte) []byte {
-	return []byte(fmt.Sprintf("%d:%s,", len(data), data))
+	lendata := len(data)
+	loglen := math.Floor(math.Log10(float64(len(data))))
+	ret := make([]byte, 0, 3+int(loglen))
+	ret = strconv.AppendInt(ret, int64(lendata), 10)
+	ret = append(ret, ':')
+	ret = append(ret, data...)
+	ret = append(ret, ',')
+
+	return ret // []byte(fmt.Sprintf("%d:%s,", len(data), data))
 }
 
 func (ns *netString) Decode(data []byte, atEOF bool) (int, []byte, error) {

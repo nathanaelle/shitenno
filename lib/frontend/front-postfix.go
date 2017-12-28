@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"fmt"
 
-	backend "github.com/nathanaelle/shitenno/backend"
+	backend "github.com/nathanaelle/shitenno/lib/backend"
 )
 
 // Postfix handler
 func Postfix() Handler {
-	return &BuffHandler{
+	return &buffHandler{
 		Transport: NetString,
 		Handler:   postfix,
 	}
@@ -20,10 +20,12 @@ func postfix(db *backend.HTTPDB, decoder *bufio.Scanner, encoder func([]byte)) e
 	for decoder.Scan() {
 		msg := bytes.SplitN(decoder.Bytes(), []byte{' '}, 2)
 
-		res, err := db.Request(&backend.Query{
-			Verb:   string(msg[0]),
-			Object: string(msg[1]),
-		})
+		query, err := backend.NewQuery(string(msg[0]), string(msg[1]))
+		if err != nil {
+			return err
+		}
+
+		res, err := db.Request(query)
 
 		if err != nil {
 			encoder([]byte("TIMEOUT error in backend"))
@@ -32,14 +34,12 @@ func postfix(db *backend.HTTPDB, decoder *bufio.Scanner, encoder func([]byte)) e
 
 		switch res.Status {
 		case "OK":
-			switch data := res.Data.(type) {
-			case string:
-				encoder([]byte("OK " + data))
-
-			default:
+			data, err := res.Postfix()
+			if err != nil {
 				encoder([]byte("TIMEOUT error in backend"))
 				return fmt.Errorf("strange Resp %+v", res)
 			}
+			encoder([]byte("OK " + data))
 
 		case "KO":
 			encoder([]byte("NOTFOUND "))

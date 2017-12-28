@@ -12,7 +12,7 @@ import (
 	"time"
 
 	sd "github.com/nathanaelle/sdialog"
-	"github.com/nathanaelle/shitenno"
+	shitenno "github.com/nathanaelle/shitenno/lib"
 	syslog "github.com/nathanaelle/syslog5424"
 	types "github.com/nathanaelle/useful.types"
 )
@@ -80,7 +80,6 @@ func main() {
 				sd.SD_ERR.LogError(e)
 			}
 		}()
-
 	}
 
 	wg := new(sync.WaitGroup)

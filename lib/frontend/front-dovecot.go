@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	backend "github.com/nathanaelle/shitenno/backend"
+	backend "github.com/nathanaelle/shitenno/lib/backend"
 )
 
 // Dovecot handler
 func Dovecot() Handler {
-	return &BuffHandler{
+	return &buffHandler{
 		Transport: DoveDict,
 		Handler:   dovecot,
 	}
@@ -31,13 +31,15 @@ func dovecot(db *backend.HTTPDB, decoder *bufio.Scanner, encoder func([]byte)) e
 
 		msg := bytes.SplitN(data[1:], []byte{'/'}, 3)
 
-		res, err := db.Request(&backend.Query{
-			Verb: string(msg[1]),
-			Object: map[string]string{
-				"context": string(msg[0]),
-				"object":  string(msg[2]),
-			},
+		query, err := backend.NewQuery(string(msg[1]), backend.DovecotQuery{
+			Namespace: string(msg[0]),
+			Object:    string(msg[2]),
 		})
+		if err != nil {
+			return err
+		}
+
+		res, err := db.Request(query)
 
 		if err != nil {
 			encoder([]byte{'F'})

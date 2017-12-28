@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -92,7 +91,7 @@ func (db *HTTPDB) Request(q *Query) (*Reply, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.New(fmt.Sprintf("status %d for %s", res.StatusCode, db.url+q.Verb))
+		return nil, fmt.Errorf("status %d for %s", res.StatusCode, db.url+q.Verb)
 	}
 
 	buff := new(bytes.Buffer)
@@ -131,7 +130,7 @@ func (db *HTTPDB) DialerTLS(network, addr string) (conn net.Conn, err error) {
 		case ocsp.Good, ocsp.Unknown:
 
 		default:
-			return nil, errors.New(fmt.Sprintf("invalid OCSP"))
+			return nil, fmt.Errorf("invalid OCSP")
 		}
 	}
 
@@ -158,15 +157,15 @@ func (db *HTTPDB) DialerTLS(network, addr string) (conn net.Conn, err error) {
 	}
 
 	if len(db.hpkp) > 0 && !certok {
-		return nil, errors.New(fmt.Sprintf("invalid HPKP"))
+		return nil, fmt.Errorf("invalid HPKP")
 	}
 
 	if !hostok {
-		return nil, errors.New(fmt.Sprintf("invalid SNI"))
+		return nil, fmt.Errorf("invalid SNI")
 	}
 
 	if ocsprep != nil && !ocspok {
-		return nil, errors.New(fmt.Sprintf("invalid OCSP"))
+		return nil, fmt.Errorf("invalid OCSP")
 	}
 
 	return c, nil

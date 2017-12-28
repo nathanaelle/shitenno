@@ -10,8 +10,8 @@ import (
 
 	"github.com/naoina/toml"
 
-	backend "github.com/nathanaelle/shitenno/backend"
-	frontend "github.com/nathanaelle/shitenno/frontend"
+	backend "github.com/nathanaelle/shitenno/lib/backend"
+	frontend "github.com/nathanaelle/shitenno/lib/frontend"
 	syslog "github.com/nathanaelle/syslog5424"
 )
 
@@ -114,7 +114,6 @@ func (shitenno *Shitenno) End() {
 			close(shitenno.mEnd)
 			shitenno.SummonGardians()
 		}
-
 	}
 }
 

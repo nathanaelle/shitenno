@@ -11,7 +11,8 @@ export	GOARCH=$(shell dpkg-architecture -qDEB_BUILD_ARCH)
 
 
 override_dh_auto_build:
-	go build -o shitenno src/*.go
+	dep ensure
+	go build -o shitenno cmd/shitenno
 
 # the only way to avoid the copy of the source tree
 override_dh_auto_install:

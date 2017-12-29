@@ -3,7 +3,6 @@ package frontend
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 
 	backend "github.com/nathanaelle/shitenno/lib/backend"
@@ -48,12 +47,7 @@ func dovecot(db *backend.HTTPDB, decoder *bufio.Scanner, encoder func([]byte)) e
 
 		switch res.Status {
 		case "OK":
-			data, err := json.Marshal(res.Data)
-			if err != nil {
-				encoder([]byte{'F'})
-				return fmt.Errorf("strange Resp %+v", res)
-			}
-
+			data := []byte(res.Data)
 			encoder(append([]byte{'O'}, data...))
 
 		case "KO":

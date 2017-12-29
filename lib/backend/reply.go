@@ -52,19 +52,19 @@ func (reply *Reply) OK(data interface{}) error {
 }
 
 // Postfix decoding
-func (request *Reply) Postfix() (data string, err error) {
-	err = json.Unmarshal(request.Data, &data)
+func (reply *Reply) Postfix() (data string, err error) {
+	err = json.Unmarshal(reply.Data, &data)
 	return
 }
 
 // Nginx decoding
-func (request *Reply) Nginx() (data NginxReply, err error) {
-	err = json.Unmarshal(request.Data, &data)
+func (reply *Reply) Nginx() (data NginxReply, err error) {
+	err = json.Unmarshal(reply.Data, &data)
 	return
 }
 
 // Dovecot decoding
-func (request *Reply) Dovecot() (data DovecotQuery, err error) {
-	err = json.Unmarshal(request.Data, &data)
+func (reply *Reply) Dovecot() (data DovecotQuery, err error) {
+	err = json.Unmarshal(reply.Data, &data)
 	return
 }

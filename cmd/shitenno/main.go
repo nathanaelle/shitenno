@@ -59,11 +59,7 @@ func main() {
 		}
 		slog, _ = syslog.New(co, *priority, appName)
 
-		go func() {
-			for e := range errChan {
-				sd.SD_ERR.LogError(e)
-			}
-		}()
+		go systemdLogError(errChan)
 
 	case !*stderr:
 		co, errChan, err := (syslog.Dialer{
@@ -75,15 +71,10 @@ func main() {
 		}
 		slog, _ = syslog.New(co, *priority, appName)
 
-		go func() {
-			for e := range errChan {
-				sd.SD_ERR.LogError(e)
-			}
-		}()
+		go systemdLogError(errChan)
 	}
 
-	wg := new(sync.WaitGroup)
-	end, update := signalCatcher()
+	wg, end, update := signalCatcher()
 
 	sd.Notify(sd.Status("Starting…"))
 	if err := sd.Watchdog(end, wg); err != nil {
@@ -101,17 +92,26 @@ func main() {
 	shitenno.End()
 }
 
-func signalCatcher() (context.Context, <-chan struct{}) {
+func systemdLogError(errChan <-chan error) {
+	for e := range errChan {
+		sd.SD_ERR.LogError(e)
+	}
+}
+
+func signalCatcher() (*sync.WaitGroup, context.Context, <-chan struct{}) {
+	wg := new(sync.WaitGroup)
 	end, cancel := context.WithCancel(context.Background())
 	update := make(chan struct{})
 
 	signalChannel := make(chan os.Signal)
 	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
+	wg.Add(1)
 	go func() {
 		for sig := range signalChannel {
 			switch sig {
 			case os.Interrupt, syscall.SIGTERM:
+				wg.Done()
 				close(signalChannel)
 				cancel()
 				close(update)
@@ -124,5 +124,5 @@ func signalCatcher() (context.Context, <-chan struct{}) {
 		}
 	}()
 
-	return end, update
+	return wg, end, update
 }

@@ -84,7 +84,7 @@ func (db *HTTPDB) Request(q *Query) (*Reply, error) {
 		return nil, err
 	}
 
-	res, err := http.Post(db.url+q.Verb, "application/json", bytes.NewReader(req))
+	res, err := db.client.Post(db.url+q.Verb, "application/json", bytes.NewReader(req))
 	if err != nil {
 		return nil, err
 	}

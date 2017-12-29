@@ -50,6 +50,14 @@ with shitenno, you have :
 
   * this code was audited 0 time
 
+## Installation
+
+### with go install
+
+```
+go install -u github.com/nathanaelle/shitenno/cmd/shitenno
+```
+
 
 ## Shitenno Configuration
 
